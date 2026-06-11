@@ -1,0 +1,162 @@
+from youtube_transcript_api import YouTubeTranscriptApi
+from urllib.parse import urlparse, parse_qs
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_chroma import Chroma
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.output_parsers import StrOutputParser
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.runnables import RunnablePassthrough, RunnableLambda, RunnableSequence, RunnableParallel
+from langchain_core.messages import HumanMessage, AIMessage
+from operator import itemgetter
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+def extract_video_id(url: str) -> str:
+    parsed_url = urlparse(url)
+
+    # Case 1: https://www.youtube.com/watch?v=VIDEO_ID
+    if parsed_url.query:
+        query_params = parse_qs(parsed_url.query)
+        if "v" in query_params:
+            return query_params["v"][0]
+
+    # Case 2: https://youtu.be/VIDEO_ID or /embed/VIDEO_ID
+    path_parts = parsed_url.path.strip("/").split("/")
+    if path_parts:
+        return path_parts[-1]
+
+    return None
+
+def get_youtube_transcript(video_id):
+    try:
+        # Note: Depending on the youtube_transcript_api version, standard fetching is usually:
+        # transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['en', 'hi', 'bn'])
+        yt_transcript_api = YouTubeTranscriptApi()
+        transcript_list = yt_transcript_api.fetch(video_id, languages=['en', "hi", 'bn'])
+        transcript = ""
+        for snippet in transcript_list:
+            transcript += snippet.text + "\n "
+        return transcript
+    except Exception as e:
+        print(e)
+        return None
+
+def format_docs(docs):
+    return "\n\n".join([doc.page_content for doc in docs])
+
+def yt_chatbot(url, query, chat_history=None):
+    if chat_history is None:
+        chat_history = []
+
+    # print("🔄️ Extracting video id and transcripts from the yt link...")
+    video_id = extract_video_id(url)
+    
+    transcript = get_youtube_transcript(video_id)
+    
+    if not transcript:
+        raise ValueError("Transcript not found for the given video URL")
+
+    # print("🔄️ Chunking the transcript...")
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=500,
+        chunk_overlap=100
+    )
+
+    chunks = splitter.split_text(transcript)
+
+    embeddings = HuggingFaceEmbeddings(
+        model_name="sentence-transformers/all-MiniLM-L6-v2",
+        model_kwargs={"device": "cpu"}
+    )
+
+    # print("🔄️ Adding embeddings to the vector store...")
+    vectorstore = Chroma.from_texts(
+        texts=chunks,
+        embedding=embeddings,
+        collection_name="yt_docs"
+    )
+
+    # 🔥 MMR RETRIEVER
+    retriever = vectorstore.as_retriever(
+        search_type="mmr",
+        search_kwargs={
+            "k": 5,          # final results
+            "fetch_k": 20,   # initial pool
+            "lambda_mult": 0.5  # diversity balance
+        }
+    )
+
+    # print("🔣 Creating ChatPromptTemplate...")
+    # 🔹 Use ChatPromptTemplate and MessagesPlaceholder for history
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a helpful YouTube video assistant. 
+        Use the following context from the video transcript to answer the user's question. 
+        If the answer is not in the context, say you don't know.
+        
+        Context:
+        {context}"""),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("human", "{question}")
+    ])
+    # print("✅ Prompt template created!")
+    
+
+    # print("🤖 Initializing Gemini...")
+    model = ChatGoogleGenerativeAI(
+        # Note: "gemini-3.1-flash-lite-preview" isn't a standard public model string yet. 
+        # Usually it's "gemini-1.5-flash" or "gemini-1.5-pro". Adjust as needed for your API access.
+        model="gemini-3.1-flash-lite-preview", 
+        temperature=0.7,
+    )
+    
+    parser = StrOutputParser()
+    
+    # 🔹 Cleaner LCEL setup using a dictionary input
+    parallel_chain = RunnableParallel(
+        context=itemgetter("question") | retriever | format_docs,
+        question=itemgetter("question"),
+        chat_history=itemgetter("chat_history")
+    )
+
+    # The pipe operator (|) connects the chain natively
+    chain = parallel_chain | prompt | model | parser
+    
+    # print("🧠 Generating response...")
+    
+    # Pass both the question and the history as a dictionary
+    result = chain.invoke({
+        "question": query,
+        "chat_history": chat_history
+    })
+    
+    # print("✅ Response generated!\n")
+    # print(result)
+    
+    return result
+
+def run_conversation(yt_video_url):
+    # Simulating a conversation with chat history
+    history = []
+    
+    query = input("Enter your question about the video: ")
+
+    while query.lower() != "exit":
+
+        response = yt_chatbot(yt_video_url, query, history)
+        print("Response from AI : ", response)
+        
+        # Update history for the next turn
+        history.extend([
+            HumanMessage(content=query),
+            AIMessage(content=response)
+        ])
+    
+   
+
+if __name__ == "__main__":
+    yt_video_url = "https://www.youtube.com/watch?v=J5_-l7WIO_w&list=PLKnIA16_RmvaTbihpo4MtzVm4XOQa0ER0&index=17" 
+    
+    run_conversation(yt_video_url)
