@@ -4,7 +4,7 @@ import asyncio
 
 from urllib.parse import urlparse, parse_qs
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpointEmbeddings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -31,9 +31,13 @@ QDRANT_CLIENT = QdrantClient(
 # Hugging Face model for embedding generation
 HF_TOKEN=os.getenv("HF_TOKEN")
 print("Initializing global embeddings model...")
-global_embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2",
-    model_kwargs={"device": "cpu", "token": HF_TOKEN}
+# global_embeddings = HuggingFaceEmbeddings(
+#     model_name="sentence-transformers/all-MiniLM-L6-v2",
+#     model_kwargs={"device": "cpu", "token": HF_TOKEN}
+# )
+global_embeddings = HuggingFaceEndpointEmbeddings(
+    model="sentence-transformers/all-MiniLM-L6-v2",
+    huggingfacehub_api_token=HF_TOKEN,
 )
 print("Embeddings model initialized.")
 

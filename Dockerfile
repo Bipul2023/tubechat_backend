@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y \
 # Install Python dependencies
 COPY requirements.txt /app/
 RUN pip install --upgrade pip && \
-    pip install -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the project into the container
 COPY . /app/
@@ -27,4 +27,4 @@ COPY . /app/
 EXPOSE 8000
 
 # Run the application with Daphne (ASGI) for Django Channels support
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "core.asgi:application"]
+# CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "core.asgi:application"]
