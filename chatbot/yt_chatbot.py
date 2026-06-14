@@ -4,7 +4,7 @@ import asyncio
 
 from urllib.parse import urlparse, parse_qs
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpointEmbeddings
+from langchain_huggingface import HuggingFaceEndpointEmbeddings
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -19,51 +19,60 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+from functools import lru_cache
+
 # QDRANT_HOST=os.getenv("QDRANT_HOST")
 # QDRANT_PORT=os.getenv("QDRANT_PORT")
 
 # QDRANT_CLIENT = QdrantClient(url=f"http://{QDRANT_HOST}:{QDRANT_PORT}")
-QDRANT_CLIENT = QdrantClient(
-    url=os.getenv("QDRANT_ENDPOINT"),
-    api_key=os.getenv("QDRANT_APIKEY"),
-)
+@lru_cache(maxsize=1)
+def get_qdrant_client():
+    return QdrantClient(
+        url=os.getenv("QDRANT_ENDPOINT"),
+        api_key=os.getenv("QDRANT_APIKEY"),
+    )
 
 # Hugging Face model for embedding generation
-HF_TOKEN=os.getenv("HF_TOKEN")
-print("Initializing global embeddings model...")
-# global_embeddings = HuggingFaceEmbeddings(
-#     model_name="sentence-transformers/all-MiniLM-L6-v2",
-#     model_kwargs={"device": "cpu", "token": HF_TOKEN}
-# )
-global_embeddings = HuggingFaceEndpointEmbeddings(
-    model="sentence-transformers/all-MiniLM-L6-v2",
-    huggingfacehub_api_token=HF_TOKEN,
-)
-print("Embeddings model initialized.")
+@lru_cache(maxsize=1)
+def get_embeddings():
+    HF_TOKEN=os.getenv("HF_TOKEN")
+    print("Initializing global embeddings model...")
+    # global_embeddings = HuggingFaceEmbeddings(
+    #     model_name="sentence-transformers/all-MiniLM-L6-v2",
+    #     model_kwargs={"device": "cpu", "token": HF_TOKEN}
+    # )
+    embeddings = HuggingFaceEndpointEmbeddings(
+        model="sentence-transformers/all-MiniLM-L6-v2",
+        huggingfacehub_api_token=HF_TOKEN,
+    )
+    print("Embeddings model initialized.")
+    return embeddings
 
 
 
 async def aget_or_create_vectorstore(video_id: str):
     """Checks if a collection exists in Qdrant. If not, fetches transcript and creates it."""
+    qdrant_client = get_qdrant_client()
+    embeddings = get_embeddings()
     
     # Sanitize the video ID to make a clean Qdrant collection name
     # e.g., "dQw4w9WgXcQ" becomes "video_dQw4w9WgXcQ"
     collection_name = f"video_{video_id}".replace("-", "_")
 
     # 1. Check if the collection already exists in Qdrant
-    if QDRANT_CLIENT.collection_exists(collection_name):
+    if qdrant_client.collection_exists(collection_name):
         print(f"Loading existing database for {video_id}...")
         return QdrantVectorStore(
-            client=QDRANT_CLIENT,
+            client=qdrant_client,
             collection_name=collection_name,
-            embedding=global_embeddings
+            embedding=embeddings
         )
 
     # 2. Otherwise, fetch data and create it from scratch
     print(f"Creating new database for {video_id}...")
     
     # Create the empty Qdrant collection explicitly setting 384 dimensions for MiniLM
-    QDRANT_CLIENT.create_collection(
+    qdrant_client.create_collection(
         collection_name=collection_name,
         vectors_config=VectorParams(size=384, distance=Distance.COSINE),
     )
@@ -72,7 +81,7 @@ async def aget_or_create_vectorstore(video_id: str):
         transcript = await get_youtube_transcript(video_id)
     except Exception as e:
         # Clean up the empty collection if transcript fetching fails
-        QDRANT_CLIENT.delete_collection(collection_name)
+        qdrant_client.delete_collection(collection_name)
         raise ValueError(f"Could not fetch transcript: {e}")
 
     splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=100)
@@ -80,9 +89,9 @@ async def aget_or_create_vectorstore(video_id: str):
 
     # 3. Initialize the VectorStore and insert the chunked texts
     vectorstore = QdrantVectorStore(
-        client=QDRANT_CLIENT,
+        client=qdrant_client,
         collection_name=collection_name,
-        embedding=global_embeddings
+        embedding=embeddings
     )
 
     await asyncio.to_thread(

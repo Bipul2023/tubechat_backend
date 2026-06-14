@@ -26,4 +26,7 @@ jobs:
             /usr/local/bin/docker-compose build
             /usr/local/bin/docker-compose up -d
             /usr/local/bin/docker-compose exec -T web python manage.py migrate
+<<<<<<< HEAD
             
+=======
+>>>>>>> f340b07 (used lazy loading for HF models)
