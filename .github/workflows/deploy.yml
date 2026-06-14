@@ -23,7 +23,7 @@ jobs:
             cd /home/ec2-user/tubechat_backend
             git status
             git pull origin main
-            docker compose build
-            docker compose up -d
-            docker compose exec -T web python manage.py migrate
-            docker compose exec -T web python manage.py collectstatic --noinput
+            /usr/local/bin/docker-compose build
+            /usr/local/bin/docker-compose up -d
+            /usr/local/bin/docker-compose exec -T web python manage.py migrate
+            /usr/local/bin/docker-compose exec -T web python manage.py collectstatic --noinput
