@@ -30,7 +30,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ["*"]
+# ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = [
+    "ec2-3-26-115-38.ap-southeast-2.compute.amazonaws.com",
+]
 
 
 # Application definition
@@ -207,8 +210,9 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:3000",
+    # "http://localhost:5173",
+    # "http://localhost:3000",
+    "https://d1ji2dn5mldale.cloudfront.net"
 ]
 
 # Celery Configuration
