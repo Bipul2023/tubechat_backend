@@ -32,7 +32,8 @@ DEBUG = False
 
 # ALLOWED_HOSTS = ["*"]
 ALLOWED_HOSTS = [
-    "ec2-3-26-115-38.ap-southeast-2.compute.amazonaws.com",
+    # "ec2-3-26-115-38.ap-southeast-2.compute.amazonaws.com",
+    "tubechat-api.duckdns.org"
 ]
 
 
