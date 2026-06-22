@@ -25,3 +25,24 @@ def get_youtube_info(url):
         cache.set(cache_key, {'title': title, 'channel': channel}, timeout=86400)
         
         return title, channel
+
+# import socket
+# import sys
+
+# def verify_tor_on_startup(host="127.0.0.1", port=9050):
+#     """Run this exactly once when the server or worker initializes."""
+#     print("Checking dependency: Tor Daemon...")
+#     try:
+#         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+#             s.settimeout(1.5)
+#             s.connect((host, port))
+#             print("✅ Tor Daemon is connected and listening on port 9050.")
+#             return True
+#     except (socket.timeout, ConnectionRefusedError):
+#         sys.exit(
+#             "\n❌❌[CRITICAL ERROR] Tor daemon is NOT running or listening on port 9050.\n"
+#             "The application cannot start without it.\n"
+#             "Please run:\n"
+#             "  sudo apt update && sudo apt install tor -y\n"
+#             "  sudo systemctl start tor\n"
+#         )

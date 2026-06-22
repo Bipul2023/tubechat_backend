@@ -33,6 +33,8 @@ DEBUG = False
 # ALLOWED_HOSTS = ["*"]
 ALLOWED_HOSTS = [
     # "ec2-3-26-115-38.ap-southeast-2.compute.amazonaws.com",
+    # "127.0.0.1:8000",
+    # "localhost",
     "tubechat-api.duckdns.org",
     "3.26.115.38"
 ]
@@ -261,7 +263,7 @@ SOCIALACCOUNT_PROVIDERS = {
 }
 
 
-SECURE_SSL_REDIRECT = False
+SECURE_SSL_REDIRECT = True
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
