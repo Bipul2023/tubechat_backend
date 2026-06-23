@@ -12,7 +12,7 @@ def get_youtube_info(url):
 
     # 'quiet': True prevents yt-dlp from printing console logs
     # 'extract_flat': True extracts metadata without downloading the video
-    ydl_opts = {'quiet': True, 'extract_flat': True} 
+    ydl_opts = {'quiet': True, 'extract_flat': True,  'cookiefile': 'cookies.txt'} 
     
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         # download=False ensures we only grab the metadata
